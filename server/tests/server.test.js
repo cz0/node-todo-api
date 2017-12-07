@@ -3,28 +3,15 @@ const { ObjectID } = require('mongodb')
 
 const { app } = require('../server')
 const { Todo } = require('../models/todo')
+const { User } = require('../models/user')
+const { todos, populateTodos, users, populateUsers } = require('./seed/seed')
 
-const initTodos = [
-    { 
-        _id: new ObjectID(),
-        text: 'First test todo' 
-    },
-    { 
-        _id: new ObjectID(),
-        text: 'Second test todo' 
-    }
-]
 
-beforeEach(done => {
-    Todo.remove({})
-        .then(() => {
-            return Todo.insertMany(initTodos)
-        })
-        .then(() => done())
-})
+beforeEach(populateTodos)
+beforeEach(populateUsers)
 
 describe('POST /todos', () => {
-    test('should create a new todo', (done) => {
+    it('should create a new todo', (done) => {
         const text = 'Test todo'
 
         request(app)
@@ -45,7 +32,7 @@ describe('POST /todos', () => {
             })
     })
 
-    test('should not create an invalid todo', (done) => {
+    it('should not create an invalid todo', (done) => {
         request(app)
             .post('/todos')
             .send({})
@@ -64,7 +51,7 @@ describe('POST /todos', () => {
 })
 
 describe('GET /todos', () => {
-    test('should get all todos', (done) => {
+    it('should get all todos', (done) => {
         const text = 'Test todo'
 
         request(app)
@@ -76,19 +63,91 @@ describe('GET /todos', () => {
 })
 
 describe('GET /todos/:id', () => {
-    test('should return todo doc', (done) => {
+    it('should return todo by id', (done) => {
         request(app)
-            .get(`/todos/${initTodos[0]._id}`)
+            .get(`/todos/${todos[0]._id}`)
             .expect(200)
-            .expect(res => expect(res.body.todo.text).toBe(initTodos[0].text))
+            .expect(res => expect(res.body.todo.text).toBe(todos[0].text))
             .end(done)
 
-    })    
-    test('should return 404 if todo not found', (done) => {
+    })
+    it('should return 404 if todo not found', (done) => {
         request(app)
             .get(`/todos/${new ObjectID()}`)
             .expect(404)
             .end(done)
 
+    })
+})
+
+describe('GET /users/me', () => {
+    it('should return user if authenticated', (done) => {
+        request(app)
+            .get('/users/me')
+            .set('x-auth', users[0].tokens[0].token)
+            .expect(200)
+            .expect((res) => {
+                expect(res.body._id).toBe(users[0]._id.toHexString())
+                expect(res.body.email).toBe(users[0].email)
+            })
+            .end(done)
+    })
+
+    it('should return 401 if not authenticated', (done) => {
+        request(app)
+            .get('/users/me')
+            .expect(401)
+            .expect((res) => {
+                expect(res.body).toEqual({})
+            })
+            .end(done)
+    })
+})
+
+describe('POST /users', () => {
+    it('should create a user', (done) => {
+        const email = 'example@host.com'
+        const password = 'hesloparol'
+
+        request(app)
+            .post('/users')
+            .send({ email, password })
+            .expect(200)
+            .expect((res) => {
+                expect(res.headers['x-auth']).toBeTruthy()
+                expect(res.body._id).toBeTruthy()
+                expect(res.body.email).toBe(email)
+            })
+            .end((err) => {
+                if (err) {
+                    return done(err)
+                }
+
+                User.findOne({ email }).then((user) => {
+                    expect(user).toBeTruthy()
+                    done()
+                })
+            })
+    })
+
+    it('should return validation errors if request invalid', (done) => {
+        const email = 'invalid'
+        const password = 'short'
+
+        request(app)
+            .post('/users')
+            .send({ email, password })
+            .expect(400)
+            .end(done)
+    })
+
+    it('should not create a user if email in use', (done) => {
+        const { email, password } = users[0]
+
+        request(app)
+            .post('/users')
+            .send({ email, password })
+            .expect(400)
+            .end(done)
     })
 })
