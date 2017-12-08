@@ -13,32 +13,58 @@ app.use(bodyParser.json())
 
 const port = process.env.PORT || 3000
 
-app.post('/todos', (req, res) => {
-    const todo = new Todo(req.body)
+app.post('/todos', authenticate, (req, res) => {
+    const todo = new Todo({
+        text: req.body.text,
+        _creator: req.user._id
+    })
     todo.save().then(
         doc => res.send(doc),
         err => res.status(400).send(err))
 })
 
-app.get('/todos', (req, res) => {
-    Todo.find().then(
-
+app.get('/todos', authenticate, (req, res) => {
+    Todo.find({
+        _creator: req.user._id
+    }).then(
         todos => res.send({ todos }),
         err => res.status(400).send(err))
 })
 
-app.get('/todos/:id', (req, res) => {
-    if (!ObjectID.isValid(req.params.id)) {
-        return res.status(404).send({ msg: 'Wrong id' })
+app.get('/todos/:id', authenticate, (req, res) => {
+    const id = req.params.id
+    if (!ObjectID.isValid(id)) {
+        return res.status(404).send()
     }
 
-    Todo.findById(req.params.id)
-        .then(todo => {
-            if (!todo) {
-                return res.status(404).send()
-            }
-            res.send({ todo })
-        })
+    Todo.findOne({
+        _id: id,
+        _creator: req.user._id
+    }).then(todo => {
+        if (!todo) {
+            return res.status(404).send()
+        }
+        res.send({ todo })
+    })
+        .catch(err =>
+            res.status(400).send(err))
+})
+
+app.delete('/todos/:id', authenticate, (req, res) => {
+    const id = req.params.id
+    if (!ObjectID.isValid(id)) {
+        return res.status(404).send()
+    }
+
+    Todo.findOneAndRemove({
+        _id: id,
+        _creator: req.user._id
+    }).then(todo => {
+        if (!todo) {
+            return res.status(404).send()
+        }
+        res.send({ todo })
+    })
         .catch(err =>
             res.status(400).send(err))
 })
