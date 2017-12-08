@@ -7,11 +7,10 @@ const { mongoose } = require('./db/mongoose')
 const { Todo } = require('./models/todo')
 const { User } = require('./models/user')
 const { authenticate } = require('./middleware/authentication')
+const config = require('./config/config')
 
 const app = express()
 app.use(bodyParser.json())
-
-const port = process.env.PORT || 3000
 
 app.post('/todos', authenticate, (req, res) => {
     const todo = new Todo({
@@ -105,8 +104,8 @@ app.delete('/users/me/token', authenticate, (req, res) => {
     })
 })
 
-app.listen(port, () => {
-    console.log(`Started on port ${port}`)
+app.listen(process.env.PORT, () => {
+    console.log(`Started on port ${process.env.PORT}`)
 })
 
 module.exports = { app }
